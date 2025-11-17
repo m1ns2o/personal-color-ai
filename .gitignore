@@ -90,3 +90,6 @@ dmypy.json
 *.tmp
 *.temp
 .cache/
+
+# Dataset
+backend/personal color.v1i.multiclass/
