@@ -1,7 +1,6 @@
 <template>
   <div class="face-shape-analyzer">
     <header class="header">
-      <router-link to="/" class="back-button">← 뒤로</router-link>
       <h1>얼굴형 진단</h1>
       <p>사진을 업로드하여 나의 얼굴형을 확인하고 스타일 추천을 받아보세요</p>
     </header>
@@ -10,7 +9,14 @@
       <!-- 이미지 업로드 영역 -->
       <div class="upload-section">
         <div v-if="!previewImage" class="upload-options">
-          <button class="upload-option-btn" @click="triggerFileInput">
+          <button
+            class="upload-option-btn"
+            :class="{ 'drag-over': isDragging }"
+            @click="triggerFileInput"
+            @drop.prevent="handleDrop"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="48"
@@ -27,6 +33,7 @@
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             <span>갤러리에서 선택</span>
+            <span class="drag-hint">또는 드래그하여 업로드</span>
           </button>
           <button class="upload-option-btn" @click="openCamera">
             <svg
@@ -48,15 +55,6 @@
             <span>카메라로 촬영</span>
           </button>
         </div>
-
-        <div
-          v-if="!previewImage && !showCamera"
-          class="upload-area"
-          :class="{ 'drag-over': isDragging }"
-          @drop.prevent="handleDrop"
-          @dragover.prevent="isDragging = true"
-          @dragleave.prevent="isDragging = false"
-        ></div>
 
         <div v-if="showCamera" class="camera-container">
           <video ref="videoElement" autoplay playsinline class="camera-preview"></video>
@@ -402,24 +400,6 @@ const analyzeFaceShape = async () => {
 .header {
   text-align: center;
   margin-bottom: 3rem;
-  position: relative;
-}
-
-.back-button {
-  position: absolute;
-  left: 0;
-  top: 0;
-  padding: 0.5rem 1rem;
-  background: #f0f0f0;
-  border-radius: 8px;
-  text-decoration: none;
-  color: #333;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.back-button:hover {
-  background: #e0e0e0;
 }
 
 .header h1 {
@@ -479,19 +459,17 @@ const analyzeFaceShape = async () => {
   color: #4a90e2;
 }
 
-.upload-area {
-  border: 2px dashed #cbd5e0;
-  border-radius: 8px;
-  padding: 2rem;
-  text-align: center;
-  transition: all 0.3s ease;
-  margin-bottom: 1.5rem;
+.upload-option-btn.drag-over {
+  border-color: #4a90e2;
+  background: #e3f2fd;
+  border-style: dashed;
 }
 
-.upload-area:hover,
-.upload-area.drag-over {
-  border-color: #4a90e2;
-  background-color: #e3f2fd;
+.drag-hint {
+  font-size: 0.85rem;
+  color: #999;
+  font-weight: 400;
+  margin-top: 0.25rem;
 }
 
 .camera-container {
@@ -761,18 +739,25 @@ const analyzeFaceShape = async () => {
     font-size: 1rem;
   }
 
-  .back-button {
-    position: static;
-    display: inline-block;
-    margin-bottom: 1rem;
-  }
-
   .upload-section {
     padding: 1.5rem;
   }
 
   .upload-options {
     grid-template-columns: 1fr;
+  }
+
+  .upload-option-btn:hover {
+    border-color: #e0e0e0;
+    background: white;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .analyze-button:hover:not(:disabled) {
+    transform: none;
+    background: #4a90e2;
+    box-shadow: none;
   }
 
   .result-section {
@@ -787,6 +772,11 @@ const analyzeFaceShape = async () => {
 
   .chart-container {
     padding: 0.5rem;
+  }
+
+  .recommendation-list li:hover {
+    background: #f7fafc;
+    transform: none;
   }
 }
 </style>

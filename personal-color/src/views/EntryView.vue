@@ -169,6 +169,17 @@
     padding: 2rem 1.5rem;
   }
 
+  .service-card:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: #e0e0e0;
+  }
+
+  .service-card:hover .card-icon {
+    background: #4a90e2;
+    transform: none;
+  }
+
   .card-icon {
     width: 80px;
     height: 80px;
