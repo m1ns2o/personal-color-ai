@@ -18,8 +18,9 @@ face_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
 eye_cascade = cv2.CascadeClassifier(EYE_CASCADE_PATH)
 
 # 모델 및 인코더 경로
-MODEL_PATH = Path(__file__).parent / "personal_color_model.joblib"
-ENCODER_PATH = Path(__file__).parent / "label_encoder.joblib"
+# 모델 파일 경로 (backend/models/)
+MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "personal_color_model.joblib"
+ENCODER_PATH = Path(__file__).parent.parent.parent / "models" / "label_encoder.joblib"
 
 # 모델 및 인코더 로드
 try:

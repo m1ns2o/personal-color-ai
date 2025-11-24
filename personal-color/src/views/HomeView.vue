@@ -1,6 +1,7 @@
 <template>
 	<div class="personal-color-analyzer">
 		<header class="header">
+			<router-link to="/" class="back-button">← 뒤로</router-link>
 			<h1>퍼스널 컬러 진단</h1>
 			<p>사진을 업로드하여 나에게 어울리는 컬러를 찾아보세요</p>
 		</header>
@@ -366,6 +367,24 @@ const analyzeImage = async () => {
 .header {
 	text-align: center;
 	margin-bottom: 3rem;
+	position: relative;
+}
+
+.back-button {
+	position: absolute;
+	left: 0;
+	top: 0;
+	padding: 0.5rem 1rem;
+	background: #f0f0f0;
+	border-radius: 8px;
+	text-decoration: none;
+	color: #333;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.back-button:hover {
+	background: #e0e0e0;
 }
 
 .header h1 {
@@ -749,6 +768,12 @@ const analyzeImage = async () => {
 
 	.header {
 		margin-bottom: 2rem;
+	}
+
+	.back-button {
+		position: static;
+		display: inline-block;
+		margin-bottom: 1rem;
 	}
 
 	.header h1 {

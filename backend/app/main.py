@@ -1,21 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from PIL import Image
-from dotenv import load_dotenv
 from pathlib import Path
-from typing import Optional
-
 import io
-import os
 
-from .classifier import analyze_image, pil_to_cv2
+from .schemas import AnalysisResponse, FaceShapeResponse
+from .services import analyze_image, pil_to_cv2, analyze_face_shape
 
-
-# .env 파일 로드
-load_dotenv()
 
 app = FastAPI(title="Personal Color Analysis API")
 
@@ -36,16 +29,6 @@ app.add_middleware(
 )
 
 
-class AnalysisResponse(BaseModel):
-    season: str
-    confidence: float
-    description: str
-    recommended_colors: list[str]
-    avoid_colors: list[str]
-    skin_tone: str
-    undertone: str
-
-
 # ======================
 #       엔드포인트
 # ======================
@@ -63,13 +46,12 @@ async def health_check():
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_personal_color(
     image: UploadFile = File(...),
-    prompt: Optional[str] = Form(None),  # 기존 프론트 호환용, 사용 안 함
 ):
     """
     이미지를 분석하여 퍼스널 컬러를 진단합니다.
-    - OpenCV Haar 기반 얼굴/눈 검출
-    - 피부/머리/눈 색 특징 추출
-    - RandomForest 머신러닝 모델 기반 4계절 판정
+    - OpenCV Haar Cascade 기반 얼굴/눈 검출
+    - 피부/머리/눈 색상 특징 추출 (Lab, HSV)
+    - RandomForest 머신러닝 모델 기반 4계절 분류 (봄/여름/가을/겨울)
     """
     try:
         contents = await image.read()
@@ -87,7 +69,7 @@ async def analyze_personal_color(
         # Check for common user-facing errors
         if "얼굴을 찾을 수 없습니다" in str(e):
             error_message = "분석 실패: 이미지에서 얼굴을 찾을 수 없습니다. 더 선명하거나 정면을 바라보는 사진을 사용해 보세요."
-        
+
         # Return a generic response for other errors
         return AnalysisResponse(
             season="Unknown",
@@ -97,6 +79,48 @@ async def analyze_personal_color(
             avoid_colors=["#000000"],
             skin_tone="unknown",
             undertone="unknown",
+        )
+
+
+@app.post("/api/analyze/face-shape", response_model=FaceShapeResponse)
+async def analyze_face_shape_endpoint(
+    image: UploadFile = File(...),
+):
+    """
+    이미지를 분석하여 얼굴형을 진단합니다.
+    - Hugging Face Vision Transformer 모델 (metadome/face_shape_classification)
+    - 5가지 얼굴형 분류: Heart(하트형), Oblong(긴형), Oval(계란형), Round(둥근형), Square(사각형)
+    - 정확도: 85.3%
+    """
+    try:
+        contents = await image.read()
+        pil_img = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="유효한 이미지 파일이 아닙니다.")
+
+    try:
+        cv_img = pil_to_cv2(pil_img)
+        result_dict = analyze_face_shape(cv_img)
+        return FaceShapeResponse(**result_dict)
+    except Exception as e:
+        # 에러 발생 시 기본 응답 반환
+        error_message = f"분석 실패: {str(e)}"
+        if "얼굴을 감지할 수 없습니다" in str(e):
+            error_message = "분석 실패: 이미지에서 얼굴을 감지할 수 없습니다. 더 선명하거나 정면을 바라보는 사진을 사용해 보세요."
+
+        return FaceShapeResponse(
+            face_shape="Unknown",
+            confidence=0,
+            description=error_message,
+            recommended_hairstyles=["분석 실패"],
+            recommended_glasses=["분석 실패"],
+            probabilities={
+                "둥근형": 20.0,
+                "계란형": 20.0,
+                "사각형": 20.0,
+                "긴형": 20.0,
+                "하트형": 20.0,
+            },
         )
 
 
