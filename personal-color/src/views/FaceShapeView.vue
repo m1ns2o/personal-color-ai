@@ -365,6 +365,8 @@ const capturePhoto = () => {
 	const context = canvas.getContext("2d");
 	if (!context) return;
 
+	context.translate(canvas.width, 0);
+	context.scale(-1, 1);
 	context.drawImage(videoElement.value, 0, 0);
 
 	canvas.toBlob(
@@ -505,7 +507,9 @@ const analyzeFaceShape = async () => {
 	width: 100%;
 	max-height: 500px;
 	object-fit: contain;
+	object-fit: contain;
 	display: block;
+	transform: scaleX(-1);
 }
 
 .camera-controls {
