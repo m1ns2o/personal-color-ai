@@ -183,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 interface AnalysisResult {
 	season: string;
@@ -193,6 +193,8 @@ interface AnalysisResult {
 	avoid_colors: string[];
 	skin_tone: string;
 	undertone: string;
+	face_box?: [number, number, number, number];
+	labeled_image?: string;
 }
 
 const API_URL = import.meta.env.PROD ? "" : "http://localhost:8000";
@@ -322,7 +324,11 @@ const getSeasonClass = (season: string) => {
 };
 
 const analyzeImage = async () => {
-	if (!selectedFile.value) return;
+	console.log("analyzeImage called");
+	if (!selectedFile.value) {
+		console.log("No file selected");
+		return;
+	}
 
 	isAnalyzing.value = true;
 	errorMessage.value = null;
@@ -341,7 +347,14 @@ const analyzeImage = async () => {
 		}
 
 		const result = await response.json();
+		console.log("Analysis Result:", result);
 		analysisResult.value = result;
+		if (result.labeled_image) {
+			console.log("Labeled image found, updating preview.");
+			previewImage.value = result.labeled_image;
+		} else {
+			console.warn("No labeled_image in result");
+		}
 	} catch (error) {
 		errorMessage.value =
 			error instanceof Error ? error.message : "분석 중 오류가 발생했습니다.";

@@ -198,6 +198,8 @@ interface FaceShapeResult {
 	recommended_hairstyles: string[];
 	recommended_glasses: string[];
 	probabilities: Record<string, number>;
+	face_box?: [number, number, number, number];
+	labeled_image?: string;
 }
 
 // 얼굴형 타입 고정 순서 (레이더 차트 축 일관성 유지)
@@ -383,7 +385,11 @@ const capturePhoto = () => {
 };
 
 const analyzeFaceShape = async () => {
-	if (!selectedFile.value) return;
+	console.log("analyzeFaceShape called");
+	if (!selectedFile.value) {
+		console.log("No file selected");
+		return;
+	}
 
 	isAnalyzing.value = true;
 	errorMessage.value = null;
@@ -402,7 +408,14 @@ const analyzeFaceShape = async () => {
 		}
 
 		const result = await response.json();
+		console.log("Analysis Result:", result);
 		analysisResult.value = result;
+		if (result.labeled_image) {
+			console.log("Labeled image found, updating preview.");
+			previewImage.value = result.labeled_image;
+		} else {
+			console.warn("No labeled_image in result");
+		}
 	} catch (error) {
 		errorMessage.value =
 			error instanceof Error ? error.message : "분석 중 오류가 발생했습니다.";

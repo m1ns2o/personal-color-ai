@@ -15,6 +15,8 @@ class AnalysisResponse(BaseModel):
     avoid_colors: list[str]
     skin_tone: str
     undertone: str
+    face_box: list[int] | None = None
+    labeled_image: str | None = None
 
 
 class FaceShapeResponse(BaseModel):
@@ -26,3 +28,5 @@ class FaceShapeResponse(BaseModel):
     recommended_hairstyles: list[str]
     recommended_glasses: list[str]
     probabilities: dict[str, float]
+    face_box: list[int] | None = None
+    labeled_image: str | None = None

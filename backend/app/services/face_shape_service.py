@@ -10,6 +10,8 @@ from PIL import Image
 from transformers import pipeline
 from typing import Dict
 import logging
+import dlib
+import base64
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +19,12 @@ logger = logging.getLogger(__name__)
 
 # 글로벌 변수로 모델 파이프라인 저장 (한 번만 로드)
 _classifier = None
+_face_detector = None
+
+# 마킹 색상 정의 (BGR 형식, #4a90e2 계열)
+COLOR_FACE = (226, 144, 74)   # 얼굴: 기본 색상 (#4a90e2)
+COLOR_CROP = (255, 215, 145)  # 크롭 영역: 매우 밝은 하늘색
+COLOR_HAIR = (185, 185, 175)  # 머리카락 영역: 매우 연한 회색빛 파란색
 
 
 def get_classifier():
@@ -31,6 +39,14 @@ def get_classifier():
         )
         logger.info("Model loaded successfully!")
     return _classifier
+
+
+def get_face_detector():
+    """Dlib 얼굴 감지기를 가져옵니다 (lazy loading)"""
+    global _face_detector
+    if _face_detector is None:
+        _face_detector = dlib.get_frontal_face_detector()
+    return _face_detector
 
 
 # 얼굴형별 한국어 정보
@@ -135,8 +151,69 @@ def analyze_face_shape(bgr: np.ndarray) -> dict:
         분석 결과 딕셔너리
     """
     try:
+        # Visualization image copy
+        vis_img = bgr.copy()
+
+        # 얼굴 감지 및 크롭
+        detector = get_face_detector()
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        faces = detector(gray)
+
+        face_box = None  # 초기화
+
+        if len(faces) > 0:
+            # 가장 큰 얼굴 선택
+            face = max(faces, key=lambda rect: rect.width() * rect.height())
+
+            # 크롭 영역 계산 (hair 영역까지 포함)
+            h, w = bgr.shape[:2]
+            face_width = face.width()
+            face_height = face.height()
+
+            # 좌우 패딩: 얼굴 너비의 20%
+            pad_w = int(face_width * 0.2)
+            # 아래 패딩: 얼굴 높이의 20%
+            pad_bottom = int(face_height * 0.2)
+            # 위쪽 확장: 얼굴 높이의 50% (hair 영역 포함)
+            pad_top = int(face_height * 0.6)
+
+            x1 = max(0, face.left() - pad_w)
+            y1 = max(0, face.top() - pad_top)  # hair 영역까지 확장
+            x2 = min(w, face.right() + pad_w)
+            y2 = min(h, face.bottom() + pad_bottom)
+
+            # Hair 영역 좌표 (시각화용)
+            hair_y1 = y1
+            hair_y2 = face.top()
+            hair_x1 = x1
+            hair_x2 = x2
+
+            # face_box 설정
+            face_box = [x1, y1, x2, y2]
+
+            # 얼굴 영역 크롭 (hair 포함)
+            face_bgr = bgr[y1:y2, x1:x2]
+            logger.info(f"Face cropped (with hair): {x1},{y1} to {x2},{y2}")
+
+            # Draw Hair Area (연한 파란색)
+            cv2.rectangle(vis_img, (hair_x1, hair_y1), (hair_x2, hair_y2), COLOR_HAIR, 2)
+            cv2.putText(vis_img, "Hair", (hair_x1, hair_y1 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_HAIR, 2)
+
+            # Draw Face Box (기본 파란색)
+            cv2.rectangle(vis_img, (face.left(), face.top()), (face.right(), face.bottom()), COLOR_FACE, 2)
+            cv2.putText(vis_img, "Face", (face.left(), face.top() - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_FACE, 2)
+
+            # Draw Crop Area (밝은 파란색)
+            cv2.rectangle(vis_img, (x1, y1), (x2, y2), COLOR_CROP, 2)
+            cv2.putText(vis_img, "Crop Area", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_CROP, 2)
+
+        else:
+            # 얼굴을 찾지 못한 경우 전체 이미지 사용
+            logger.warning("No face detected for shape analysis. Using full image.")
+            face_bgr = bgr
+
         # BGR을 RGB로 변환
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
 
         # PIL Image로 변환
         pil_image = Image.fromarray(rgb)
@@ -172,7 +249,12 @@ def analyze_face_shape(bgr: np.ndarray) -> dict:
         # 최종 결과 구성
         shape_info = FACE_SHAPE_INFO.get(predicted_shape, FACE_SHAPE_INFO["Oval"])
 
-        return {
+        # Encode visualization image to base64
+        _, buffer = cv2.imencode('.jpg', vis_img)
+        labeled_image_base64 = base64.b64encode(buffer).decode('utf-8')
+        labeled_image = f"data:image/jpeg;base64,{labeled_image_base64}"
+
+        result_dict = {
             "face_shape": shape_info["ko"],
             "face_shape_en": predicted_shape,
             "confidence": round(confidence, 2),
@@ -180,7 +262,13 @@ def analyze_face_shape(bgr: np.ndarray) -> dict:
             "recommended_hairstyles": shape_info["recommended_hairstyles"],
             "recommended_glasses": shape_info["recommended_glasses"],
             "probabilities": probabilities,
+            "face_box": face_box,
+            "labeled_image": labeled_image,
         }
+        
+        logger.info(f"Returning result with keys: {list(result_dict.keys())}")
+
+        return result_dict
 
     except Exception as e:
         logger.error(f"Face shape analysis failed: {str(e)}")
@@ -199,4 +287,5 @@ def analyze_face_shape(bgr: np.ndarray) -> dict:
                 "둥근형": 20.0,
                 "사각형": 20.0,
             },
+            "face_box": None,
         }
